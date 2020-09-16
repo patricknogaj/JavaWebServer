@@ -87,9 +87,9 @@ If-Modified-Since
 MIME types were originally engineered for SMTP in order to describe how data should be parsed and interpreted. The Content-Type header field in HTTP 1.0 responses is a MIME type, as defined in RFC-1521. Since MIME types describe the format of the data being delivered, they are based on a resource's file type extension and always consist of <type>/<subtype>. Regular ".html" files are, for instance "text/html". You should support delivering the following MIME types and subtypes:
  
 ```
-	text/(html and plain) <br>
-	image/(gif, jpeg and png) <br>
-	application/(octet-stream, pdf, x-gzip, zip) <br>
+	text/(html and plain) 
+	image/(gif, jpeg and png) 
+	application/(octet-stream, pdf, x-gzip, zip) 
 ```
     
 If you ever receive a request for a resource whose MIME type you do not support or can not determine, you should default to 'application/octet-stream'.
@@ -99,16 +99,16 @@ There are several resources that document MIME types and how they pair up with f
 HTTP 1.0 has quite a few additional status codes. You should support:
     
 ```	
-	200    OK<br>
-	304    Not Modified<br>
-	400    Bad Request<br>
-	403    Forbidden<br>
-	404    Not Found<br>
-	408    Request Timeout<br>
-	500    Internal Server Error<br>
-	501    Not Implemented<br>
-	503    Service Unavailable<br>
-	505    HTTP Version Not Supported<br>
+	200    OK
+	304    Not Modified
+	400    Bad Request
+	403    Forbidden
+	404    Not Found
+	408    Request Timeout
+	500    Internal Server Error
+	501    Not Implemented
+	503    Service Unavailable
+	505    HTTP Version Not Supported
 ```
 
 6. A Request Timeout is required.
