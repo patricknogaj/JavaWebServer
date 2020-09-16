@@ -1,7 +1,6 @@
 <center><h1>CS352 Project 1 Taskers</h1></center>
 <h2>Tasks</h2>
-Below, we will denote each task, and we will update this document when a certain task is complete to minimize miscommunication.
-<br>
+Below, we will denote each task, and we will update this document when a certain task is complete to minimize miscommunication.<br><br>
 
 Name | Contact Information
 ------------ | -------------
