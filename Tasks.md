@@ -3,6 +3,7 @@
 Below, we will denote each task, and we will update this document when a certain task is complete to minimize miscommunication.
 
 <h2>Requirements</h2>
+
 * [x] Accept the port to listen on as args[0] in the main method. The port should be parsed into an int or Integer.
 
 * [ ] Construct a ServerSocket that accepts connections on the port specified in the command-line argument.
