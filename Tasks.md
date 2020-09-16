@@ -4,7 +4,7 @@ Below, we will denote each task, and we will update this document when a certain
 
 Name | Contact Information
 ------------ | -------------
-Patrick Nogaj | C: (732) 580-0207<br>Discord: myth#<br>E-mail: patrick.nogaj@rutgers.edu
+Patrick Nogaj | C: (732) 580-0207<br>Discord: myth#3559<br>E-mail: patrick.nogaj@rutgers.edu
 xxx | xxx
 xxx | xxx
 
