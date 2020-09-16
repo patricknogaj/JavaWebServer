@@ -10,7 +10,7 @@ xxx | xxx
 
 <h2>Requirements</h2>
 
-* [x] Accept the port to listen on as args[0] in the main method. The port should be parsed into an int or Integer.
+* [x] Accept the port to listen on as args[0] in the main method. The port should be parsed into an int or Integer.<br><b>Completion date:</b> September 16th, 2020
 
 * [ ] Construct a ServerSocket that accepts connections on the port specified in the command-line argument.
 
