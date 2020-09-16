@@ -2,6 +2,12 @@
 <h2>Tasks</h2>
 Below, we will denote each task, and we will update this document when a certain task is complete to minimize miscommunication.
 
+Name | Contact Information
+------------ | -------------
+Patrick Nogaj | C: (732) 580-0207<br>Discord: myth#<br>E-mail: patrick.nogaj@rutgers.edu
+xxx | xxx
+xxx | xxx
+
 <h2>Requirements</h2>
 
 * [x] Accept the port to listen on as args[0] in the main method. The port should be parsed into an int or Integer.
