@@ -56,13 +56,13 @@ HTTP 1.0 is fully defined in <a href="https://tools.ietf.org/html/rfc1945">RFC-1
 1. Version tags:
 Every HTTP 1.0 request and response must have the HTTP version in it.
 
-Requests:
+```Requests:
 	<command> <resource> HTTP/1.0
         
 Response:
 	HTTP/1.0 <status code> <explanation>
 	<response head>    
-	<response body>
+	<response body>```
  
 If your server receives a request that does not have a version number, it is considered malformed and should get a "400 Bad Request" response.
 If your server receives a request that has a version number greater than 1.0, the version is higher than what you can support, and you should respond with a "505 HTTP Version Not Supported"
@@ -84,9 +84,9 @@ If-Modified-Since
 4. MIME types:
 MIME types were originally engineered for SMTP in order to describe how data should be parsed and interpreted. The Content-Type header field in HTTP 1.0 responses is a MIME type, as defined in RFC-1521. Since MIME types describe the format of the data being delivered, they are based on a resource's file type extension and always consist of <type>/<subtype>. Regular ".html" files are, for instance "text/html". You should support delivering the following MIME types and subtypes:
  
-	text/(html and plain) <br>
+	```text/(html and plain) <br>
 	image/(gif, jpeg and png) <br>
-	application/(octet-stream, pdf, x-gzip, zip) <br>
+	application/(octet-stream, pdf, x-gzip, zip) <br>```
     
 If you ever receive a request for a resource whose MIME type you do not support or can not determine, you should default to 'application/octet-stream'.
 There are several resources that document MIME types and how they pair up with filename extensions, like this catalogue.
@@ -94,7 +94,7 @@ There are several resources that document MIME types and how they pair up with f
 5. Response status codes:
 HTTP 1.0 has quite a few additional status codes. You should support:
     
-	200    OK<br>
+```	200    OK<br>
 	304    Not Modified<br>
 	400    Bad Request<br>
 	403    Forbidden<br>
@@ -103,9 +103,9 @@ HTTP 1.0 has quite a few additional status codes. You should support:
 	500    Internal Server Error<br>
 	501    Not Implemented<br>
 	503    Service Unavailable<br>
-	505    HTTP Version Not Supported<br>
+	505    HTTP Version Not Supported<br>```
 
 6. A Request Timeout is required.
 If the client opens a connection with the server but does not send any request within 5 seconds, your server should send this response.
 
-	408 Request Timeout
+	```408 Request Timeout```
