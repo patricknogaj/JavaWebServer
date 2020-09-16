@@ -1,4 +1,3 @@
-<center><h1>CS352 Project 1 Taskers</h1></center>
 <h2>Tasks</h2>
 Below, we will denote each task, and we will update this document when a certain task is complete to minimize miscommunication.<br><br>
 
@@ -12,7 +11,7 @@ xxx | xxx
 
 * [x] Accept the port to listen on as args[0] in the main method. The port should be parsed into an int or Integer.<br><b>Completion date:</b> September 16th, 2020
 
-* [ ] Construct a ServerSocket that accepts connections on the port specified in the command-line argument.
+* [x] Construct a ServerSocket that accepts connections on the port specified in the command-line argument. <br><b>Completion date:</b> September 16th, 2020
 
 * [ ] When a client connects to your ServerSocket, you are to hand off the created Socket to a Thread that handles all the client's communication. Absolutely no reading or writing to or from a Socket should occur in the class that the ServerSocket is accepting connections in except when all your Threads are busy (see below).
 
