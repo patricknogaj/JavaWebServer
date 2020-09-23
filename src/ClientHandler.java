@@ -3,6 +3,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
+import java.util.HashMap;
 
 /**
  * Rutgers University -- Information Technology CS352
@@ -14,7 +15,16 @@ public class ClientHandler extends Thread {
 	
 	private Socket socket;
 	
-	String[] COMMANDS = {"GET", "POST", "HEAD"};
+	//HashMap value of {COMMAND_NAME, SUPPORTED {1: true, 0: false}
+	final HashMap<String, Integer> COMMANDS = new HashMap<String, Integer>() {{
+		put("GET", 1);
+		put("HEAD", 1);
+		put("POST", 1);
+		put("LINK", 0);
+		put("UNLINK", 0);
+		put("DELETE", 0);
+		put("PUT", 0);
+	}};
 	
 	public ClientHandler(Socket socket) {
 		this.socket = socket;
@@ -33,6 +43,20 @@ public class ClientHandler extends Thread {
 			
 			if(header.length != 3) {
 				writeResponse(dataOut, 400);
+				reader.close();
+				socket.close();
+				return;
+			}
+			
+			if(!COMMANDS.containsKey(header[0])) {
+				writeResponse(dataOut, 400);
+				reader.close();
+				socket.close();
+				return;
+			}
+			
+			if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) {
+				writeResponse(dataOut, 501);
 				reader.close();
 				socket.close();
 				return;
