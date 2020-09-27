@@ -22,6 +22,9 @@ import java.util.TimeZone;
 public class ClientHandler extends Thread {
 	
 	private Socket socket;
+	private File file;
+	private int fileLength;
+	byte[] payload;
 	
 	//HashMap value of {COMMAND_NAME, SUPPORTED {1: true, 0: false}
 	private final HashMap<String, Integer> COMMANDS = new HashMap<String, Integer>() {{
@@ -43,10 +46,20 @@ public class ClientHandler extends Thread {
 		try {
 			InputStream inputStream = socket.getInputStream();
 			PrintStream out = new PrintStream(socket.getOutputStream());
-			
 			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+			DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
 			String requestLine = reader.readLine();
-			out.print(writeMessage(requestLine));
+			String modifiedDate = reader.readLine();
+			
+			out.print(writeMessage(requestLine, modifiedDate));
+			
+			if(payload != null)
+				outStream.write(payload);
+			
+			outStream.flush();
+			outStream.close();
+			
+			out.flush();
 			out.close();
 			inputStream.close();
 			reader.close();
@@ -56,7 +69,7 @@ public class ClientHandler extends Thread {
 		}
 	}
 	
-	public String writeMessage(String requestLine) {
+	public String writeMessage(String requestLine, String modifiedDate) throws IOException {
 		String[] header = requestLine.split("\\s+");
 		if(header.length != 3) {
 			return "HTTP/1.0 400 " + getResponse(400);
@@ -68,36 +81,39 @@ public class ClientHandler extends Thread {
 			} else if(!header[2].equals("HTTP/1.0")) {
 				return "HTTP/1.0 505 " + getResponse(505);
 			} else {
-				File file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
-				
+				file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
+				fileLength = (int) file.length();
 				if(!file.isFile()) {
 					return "HTTP/1.0 404 " + getResponse(404);
-				} else if(file.isFile() && !file.canRead()){
+				} else if(!file.canRead()){
+					System.out.println(requestLine + " is forbidden!");
 					return "HTTP/1.0 403 " + getResponse(403);
 				} else {
-					int fileLength = (int) file.length();
 					long lastModified = file.lastModified();
 					Date date = new Date(lastModified);
 					Date currentDate = new Date();
 					SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
 					dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+					payload = readFileData(file, fileLength);
 					
-					byte[] payload = null;
-					try {
-						payload = readFileData(file, fileLength);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+					if(modifiedDate.length() > 0) {
+						if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
+							Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
+						
+							if(date.compareTo(ifModifiedDate) == -1) {
+								if(!header[0].contains("HEAD"))
+									return "HTTP/1.0 304 " + getResponse(304) + "\r\n" + 
+									   	"Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n\r\n";
+							}
+						}
 					}
-					
 					return "HTTP/1.0 200 " + getResponse(200) + "\r\n" + 
 							"Content-Type: " + contentType(header[1]) + "\r\n" +
 							"Content-Length: " + fileLength + "\r\n" +
 							"Last-Modified: " + dateFormat.format((new Date(lastModified))) + "\r\n" +
 							"Content-Encoding: identity" + "\r\n" +
 							"Allow: GET, POST, HEAD" + "\r\n" +
-							"Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n" +
-							new String(payload);
+							"Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n\r\n";
 				}
 			}
 		}
