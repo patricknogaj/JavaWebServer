@@ -1,9 +1,17 @@
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.TimeZone;
 
 /**
  * Rutgers University -- Information Technology CS352
@@ -16,7 +24,7 @@ public class ClientHandler extends Thread {
 	private Socket socket;
 	
 	//HashMap value of {COMMAND_NAME, SUPPORTED {1: true, 0: false}
-	final HashMap<String, Integer> COMMANDS = new HashMap<String, Integer>() {{
+	private final HashMap<String, Integer> COMMANDS = new HashMap<String, Integer>() {{
 		put("GET", 1);
 		put("HEAD", 1);
 		put("POST", 1);
@@ -34,43 +42,13 @@ public class ClientHandler extends Thread {
 	public void run() {
 		try {
 			InputStream inputStream = socket.getInputStream();
-			PrintStream dataOut = new PrintStream(socket.getOutputStream());
+			PrintStream out = new PrintStream(socket.getOutputStream());
 			
 			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 			String requestLine = reader.readLine();
-			
-			String[] header = requestLine.split("\\s+");
-			
-			if(header.length != 3) {
-				writeResponse(dataOut, 400);
-				reader.close();
-				socket.close();
-				return;
-			}
-			
-			if(!COMMANDS.containsKey(header[0])) {
-				writeResponse(dataOut, 400);
-				reader.close();
-				socket.close();
-				return;
-			}
-			
-			if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) {
-				writeResponse(dataOut, 501);
-				reader.close();
-				socket.close();
-				return;
-			}
-			
-			if(!header[2].equals("HTTP/1.0")) {
-				writeResponse(dataOut, 505);
-				reader.close();
-				socket.close();
-				return;
-			}
-			
-			System.out.println("RequestLine: " + requestLine);
-			
+			out.print(writeMessage(requestLine));
+			out.close();
+			inputStream.close();
 			reader.close();
 			socket.close();
 		} catch (Exception e) {
@@ -78,9 +56,65 @@ public class ClientHandler extends Thread {
 		}
 	}
 	
-	public void writeResponse(PrintStream out, int code) {
-		out.print("HTTP/1.0 " + code + " " + getResponse(code));
-		out.close();
+	public String writeMessage(String requestLine) {
+		String[] header = requestLine.split("\\s+");
+		if(header.length != 3) {
+			return "HTTP/1.0 400 " + getResponse(400);
+		} else {
+			if(!COMMANDS.containsKey(header[0])) {
+				return "HTTP/1.0 400 " + getResponse(400);
+			} else if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) {
+				return "HTTP/1.0 501 " + getResponse(501);
+			} else if(!header[2].equals("HTTP/1.0")) {
+				return "HTTP/1.0 505 " + getResponse(505);
+			} else {
+				File file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
+				
+				if(!file.isFile()) {
+					return "HTTP/1.0 404 " + getResponse(404);
+				} else if(file.isFile() && !file.canRead()){
+					return "HTTP/1.0 403 " + getResponse(403);
+				} else {
+					int fileLength = (int) file.length();
+					long lastModified = file.lastModified();
+					Date date = new Date(lastModified);
+					Date currentDate = new Date();
+					SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
+					dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+					
+					byte[] payload = null;
+					try {
+						payload = readFileData(file, fileLength);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					
+					return "HTTP/1.0 200 " + getResponse(200) + "\r\n" + 
+							"Content-Type: " + contentType(header[1]) + "\r\n" +
+							"Content-Length: " + fileLength + "\r\n" +
+							"Last-Modified: " + dateFormat.format((new Date(lastModified))) + "\r\n" +
+							"Content-Encoding: identity" + "\r\n" +
+							"Allow: GET, POST, HEAD" + "\r\n" +
+							"Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n" +
+							new String(payload);
+				}
+			}
+		}
+	}
+	
+	private byte[] readFileData(File file, int fileLength) throws IOException {
+		FileInputStream fileInput = null;
+		byte[] fileData = new byte[fileLength];
+		
+		try {
+			fileInput = new FileInputStream(file);
+			fileInput.read(fileData);
+		} finally {
+			if (fileInput != null) 
+				fileInput.close();
+		}
+		return fileData;
 	}
 	
 	/**
