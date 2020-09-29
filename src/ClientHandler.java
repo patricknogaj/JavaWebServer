@@ -8,15 +8,15 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.TimeZone;
 
 /**
  * Rutgers University -- Information Technology CS352
- * @author Patrick Nogaj (NET ID: pn220)
+ * @author Patrick Nogaj (NET ID: pn220), Stephen Fu (NET ID: svf13), ??? (NET ID: ???)
  * 
  */
 
@@ -47,58 +47,64 @@ public class ClientHandler extends Thread {
 			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 			DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
 			
-			String requestLine = reader.readLine();
-			String modifiedDate = reader.readLine();
-			String[] header = requestLine.split("\\s+");
-			
-			if(header.length != 3) {
-				out.print(getResponse(400));
-			} else {
-				if(!COMMANDS.containsKey(header[0])) {
+			socket.setSoTimeout(5000);
+			try {
+				String requestLine = reader.readLine();
+				String modifiedDate = reader.readLine();
+				String[] header = requestLine.split("\\s+");
+				
+				if(header.length != 3) {
 					out.print(getResponse(400));
-				} else if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) {
-					out.print(getResponse(501));
-				} else if(!header[2].equals("HTTP/1.0")) {
-					out.print(getResponse(505));
 				} else {
-					File file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
-					int fileLength = (int) file.length();
-					
-					if(!file.isFile()) {
-						out.print(getResponse(404));
-					} else if(!file.canRead()){
-						out.print(getResponse(403));
+					if(!COMMANDS.containsKey(header[0])) {
+						out.print(getResponse(400));
+					} else if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) {
+						out.print(getResponse(501));
+					} else if(!header[2].equals("HTTP/1.0")) {
+						out.print(getResponse(505));
 					} else {
-						long lastModified = file.lastModified();
-						Date date = new Date(lastModified);
-						Date currentDate = new Date();
-						SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
-						dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
-						byte[] payload = readFileData(file, fileLength);
+						File file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
+						int fileLength = (int) file.length();
 						
-						if(modifiedDate.length() > 0) {
-							if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
-								Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
+						if(!file.isFile()) {
+							out.print(getResponse(404));
+						} else if(!file.canRead()){
+							out.print(getResponse(403));
+						} else {
+							long lastModified = file.lastModified();
+							Date date = new Date(lastModified);
+							Date currentDate = new Date();
+							SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
+							dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+							byte[] payload = readFileData(file, fileLength);
 							
-								if(date.compareTo(ifModifiedDate) == -1) {
-									if(!header[0].contains("HEAD")) {
-										out.print(getResponse(304));
-										out.print("Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n\r\n");
-									}
-								} 
+							if(modifiedDate.length() > 0) {
+								if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
+									Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
+								
+									if(date.compareTo(ifModifiedDate) == -1) {
+										if(!header[0].contains("HEAD")) {
+											out.print(getResponse(304));
+											out.print("Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n\r\n");
+										}
+									} 
+								}
 							}
+							out.print(getResponse(200));
+							out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
+									  "Content-Length: " + fileLength + "\r\n" +
+									  "Last-Modified: " + dateFormat.format((new Date(lastModified))) + "\r\n" +
+									  "Content-Encoding: identity" + "\r\n" +
+									  "Allow: GET, POST, HEAD" + "\r\n" +
+									  "Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n\r\n");
+							outStream.write(payload);
 						}
-						out.print(getResponse(200));
-						out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
-								  "Content-Length: " + fileLength + "\r\n" +
-								  "Last-Modified: " + dateFormat.format((new Date(lastModified))) + "\r\n" +
-								  "Content-Encoding: identity" + "\r\n" +
-								  "Allow: GET, POST, HEAD" + "\r\n" +
-								  "Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n\r\n");
-						outStream.write(payload);
 					}
 				}
+			} catch (SocketTimeoutException se) {
+				out.print(getResponse(408));
 			}
+			
 			outStream.flush();
 			outStream.close();
 			out.flush();
