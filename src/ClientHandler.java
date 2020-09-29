@@ -106,8 +106,11 @@ public class ClientHandler extends Thread {
 			}
 			
 			outStream.flush();
-			outStream.close();
 			out.flush();
+			
+			Thread.sleep(250); //wait for 0.25s after flush to close out everything else.
+			
+			outStream.close();
 			out.close();
 			inputStream.close();
 			reader.close();
