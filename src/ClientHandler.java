@@ -23,7 +23,7 @@ import java.util.TimeZone;
 public class ClientHandler extends Thread {
 	
 	private Socket socket;
-	
+	private static int numConnections = 0;
 	//HashMap value of {COMMAND_NAME, SUPPORTED {1: true, 0: false}
 	private final HashMap<String, Integer> COMMANDS = new HashMap<String, Integer>() {{
 		put("GET", 1);
@@ -37,6 +37,7 @@ public class ClientHandler extends Thread {
 	
 	public ClientHandler(Socket socket) {
 		this.socket = socket;
+		numConnections++;
 		start();
 	}
 	
@@ -46,6 +47,17 @@ public class ClientHandler extends Thread {
 			PrintStream out = new PrintStream(socket.getOutputStream());
 			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 			DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
+
+		if (numConnections > 50) {
+				out.print(getResponse(503));
+				outStream.close();
+				out.close();
+				inputStream.close();
+				reader.close();
+				socket.close();
+				numConnections--;
+				return;
+			}
 			
 			socket.setSoTimeout(5000);
 			try {
@@ -115,6 +127,7 @@ public class ClientHandler extends Thread {
 			inputStream.close();
 			reader.close();
 			socket.close();
+			numConnections--;
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
