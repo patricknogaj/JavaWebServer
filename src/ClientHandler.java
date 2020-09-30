@@ -16,7 +16,7 @@ import java.util.TimeZone;
 
 /**
  * Rutgers University -- Information Technology CS352
- * @author Patrick Nogaj (NET ID: pn220), Stephen Fu (NET ID: svf13), ??? (NET ID: ???)
+ * @author Patrick Nogaj (NET ID: pn220), Stephen Fu (NET ID: svf13), Jayson Pitta (NET ID: jrp289)
  * 
  */
 
