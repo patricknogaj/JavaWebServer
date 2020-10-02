@@ -69,13 +69,17 @@ public class ClientHandler extends Thread {
 					
 					if(header.length != 3) {
 						out.print(getResponse(400));
-					} else {
+					} else {	
+						double versionNumber = 1.0;
+						if(header[2].startsWith("HTTP/"))
+							versionNumber = Double.parseDouble(header[2].substring(5, header[2].length()));
+						
 						if(!COMMANDS.containsKey(header[0])) {
 							out.print(getResponse(400));
 						} else if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) {
 							out.print(getResponse(501));
-						} else if(!header[2].equals("HTTP/1.0")) {
-							out.print(getResponse(505));
+						} else if(versionNumber < 0.0 || versionNumber > 1.0) {
+								out.print(getResponse(505));
 						} else {
 							File file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
 							int fileLength = (int) file.length();
@@ -130,7 +134,6 @@ public class ClientHandler extends Thread {
 				inputStream.close();
 				reader.close();
 			} 
-			System.out.println("closing socket..." + socket);
 			socket.close();
 		} catch (SocketException se) {
 			se.printStackTrace();
