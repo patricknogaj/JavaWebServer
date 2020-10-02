@@ -3,12 +3,19 @@ import java.net.Socket;
 
 /**
  * Rutgers University -- Information Technology CS352
- * @author Patrick Nogaj (NET ID: pn220)
+ * @author Patrick Nogaj (NET ID: pn220) 
+ * 		   Stephen Fu (NET ID: svf13) 
+ *         Jayson Pitta (NET ID: jrp289)
  * 
  */
 
 public class PartialHTTP1Server {
 
+	/**
+	 * We start by attempting to parse arg[0] as an Integer which will be stored into port variable.
+	 * We create a ServerSocket, create a socket object, and accept the incoming connection, and pass it to ClientHandler
+	 * @param args :: arg[0] -> port number (integer)
+	 */
 	public static void main(String[] args) {
 		
 		int port = 0;

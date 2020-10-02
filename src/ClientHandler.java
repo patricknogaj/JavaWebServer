@@ -7,7 +7,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -16,7 +15,9 @@ import java.util.TimeZone;
 
 /**
  * Rutgers University -- Information Technology CS352
- * @author Patrick Nogaj (NET ID: pn220), Stephen Fu (NET ID: svf13), Jayson Pitta (NET ID: jrp289)
+ * @author Patrick Nogaj (NET ID: pn220) 
+ * 		   Stephen Fu (NET ID: svf13) 
+ *         Jayson Pitta (NET ID: jrp289)
  * 
  */
 
@@ -24,6 +25,7 @@ public class ClientHandler extends Thread {
 	
 	private Socket socket;
 	private static int numConnections = 0;
+	
 	//HashMap value of {COMMAND_NAME, SUPPORTED {1: true, 0: false}
 	private final HashMap<String, Integer> COMMANDS = new HashMap<String, Integer>() {{
 		put("GET", 1);
@@ -35,6 +37,10 @@ public class ClientHandler extends Thread {
 		put("PUT", 0);
 	}};
 	
+	/**
+	 * Default constructor which starts the thread in run()
+	 * @param socket - socket passed from PartialHTTP1Server.java
+	 */
 	public ClientHandler(Socket socket) {
 		this.socket = socket;
 		numConnections++;
@@ -83,9 +89,9 @@ public class ClientHandler extends Thread {
 						} else if(!file.canRead()){
 							out.print(getResponse(403));
 						} else {
-							long lastModified = file.lastModified();
-							Date date = new Date(lastModified);
+							Date lastModifiedDate = new Date(file.lastModified());
 							Date currentDate = new Date();
+							currentDate.setYear(currentDate.getYear() + 1);
 							SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
 							dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
 							byte[] payload = readFileData(file, fileLength);
@@ -94,10 +100,10 @@ public class ClientHandler extends Thread {
 								if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
 									Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
 								
-									if(date.compareTo(ifModifiedDate) == -1) {
+									if(lastModifiedDate.compareTo(ifModifiedDate) == -1) {
 										if(!header[0].contains("HEAD")) {
 											out.print(getResponse(304));
-											out.print("Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n\r\n");
+											out.print("Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
 										}
 									} 
 								}
@@ -105,11 +111,12 @@ public class ClientHandler extends Thread {
 							out.print(getResponse(200));
 							out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
 									  "Content-Length: " + fileLength + "\r\n" +
-									  "Last-Modified: " + dateFormat.format((new Date(lastModified))) + "\r\n" +
+									  "Last-Modified: " + dateFormat.format(lastModifiedDate) + "\r\n" +
 									  "Content-Encoding: identity" + "\r\n" +
 									  "Allow: GET, POST, HEAD" + "\r\n" +
-									  "Expires: " + dateFormat.format(new Date(currentDate.getYear() + 1, currentDate.getMonth(), currentDate.getDay()))+ "\r\n\r\n");
-							outStream.write(payload);
+									  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+							if(header[0].equals("GET") || header[0].equals("POST"))
+								outStream.write(payload);
 						}
 					}
 				}
@@ -133,6 +140,13 @@ public class ClientHandler extends Thread {
 		}
 	}
 	
+	/**
+	 * Return data from file in byte[] format.
+	 * @param file :: File passed as argument, from header[1]
+	 * @param fileLength :: length of file to allocate enough byte[] space.
+	 * @return :: return byte[] which is content of file
+	 * @throws IOException :: if FileNotFound throw Exception
+	 */
 	private byte[] readFileData(File file, int fileLength) throws IOException {
 		FileInputStream fileInput = null;
 		byte[] fileData = new byte[fileLength];
