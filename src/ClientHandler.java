@@ -7,12 +7,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.TimeZone;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Rutgers University -- Information Technology CS352
@@ -22,7 +22,7 @@ import java.util.TimeZone;
  * 
  */
 
-public class ClientHandler extends Thread {
+public class ClientHandler implements Runnable {
 	
 	private Socket socket;
 	
@@ -43,103 +43,117 @@ public class ClientHandler extends Thread {
 	 */
 	public ClientHandler(Socket socket) {
 		this.socket = socket;
-		run();
+		//run();
 	}
 	
+	/**
+	 * Executor will call run() once executed(), which calls processRequest()
+	 */
 	public void run() {
-		try {
-			if(!socket.isClosed()) {
-				InputStream inputStream = socket.getInputStream();
-				PrintStream out = new PrintStream(socket.getOutputStream());
-				BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-				DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
-				
-				socket.setSoTimeout(5000);
-				try {
-					if(inputStream == null || reader == null)
-						return;
-					
-					String requestLine = reader.readLine();
-					String modifiedDate = reader.readLine();
-					
-					if(requestLine == null)
-						return;
-					
-					String[] header = requestLine.split("\\s+");
-					
-					if(header.length != 3) {
-						out.print(getResponse(400));
-					} else {	
-						double versionNumber = 1.0;
-						if(header[2].startsWith("HTTP/"))
-							versionNumber = Double.parseDouble(header[2].substring(5, header[2].length()));
-						
-						if(!COMMANDS.containsKey(header[0])) {
-							out.print(getResponse(400));
-						} else if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) {
-							out.print(getResponse(501));
-						} else if(versionNumber < 0.0 || versionNumber > 1.0) {
-								out.print(getResponse(505));
-						} else {
-							File file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
-							int fileLength = (int) file.length();
-							
-							if(!file.isFile()) {
-								out.print(getResponse(404));
-							} else if(!file.canRead()){
-								out.print(getResponse(403));
-							} else {
-								Date lastModifiedDate = new Date(file.lastModified());
-								Date currentDate = new Date();
-								currentDate.setYear(currentDate.getYear() + 1);
-								SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
-								dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
-								byte[] payload = readFileData(file, fileLength);
-								
-								if(modifiedDate.length() > 0) {
-									if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
-										Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
-									
-										if(lastModifiedDate.compareTo(ifModifiedDate) == -1) {
-											if(!header[0].contains("HEAD")) {
-												out.print(getResponse(304));
-												out.print("Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
-											}
-										} 
-									}
-								}
-								out.print(getResponse(200));
-								out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
-										  "Content-Length: " + fileLength + "\r\n" +
-										  "Last-Modified: " + dateFormat.format(lastModifiedDate) + "\r\n" +
-										  "Content-Encoding: identity" + "\r\n" +
-										  "Allow: GET, POST, HEAD" + "\r\n" +
-										  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
-								if(header[0].equals("GET") || header[0].equals("POST"))
-									outStream.write(payload);
-							}
-						}
-					}
-				} catch (SocketTimeoutException se) {
-					out.print(getResponse(408));
-				}
-				
-				outStream.flush();
-				out.flush();
-				
-				Thread.sleep(250); //wait for 0.25s after flush to close out everything else.
-				
-				outStream.close();
-				out.close();
-				inputStream.close();
-				reader.close();
-			} 
-			socket.close();
-		} catch (SocketException se) {
-			se.printStackTrace();
+		try {			
+			processRequest();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+	
+	/**
+	 * Opens streams for input/output and processes information.
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void processRequest() throws IOException, InterruptedException {
+		if(!socket.isClosed()) {
+			//Initial streams that we need
+			InputStream inputStream = socket.getInputStream();
+			PrintStream out = new PrintStream(socket.getOutputStream());
+			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+			DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
+
+			//5 second timeout for err 408
+			socket.setSoTimeout(5000);
+			try {
+				if(inputStream == null || reader == null)
+					return;
+				
+				String requestLine = reader.readLine();
+				String modifiedDate = reader.readLine();
+				
+				if(requestLine == null)
+					return;
+				
+				String[] header = requestLine.split("\\s+");
+				
+				if(header.length != 3) { //if header does not have 3 parts IE method, file, version
+					out.print(getResponse(400));
+				} else {	
+					double versionNumber = 1.0;
+					if(header[2].startsWith("HTTP/"))
+						versionNumber = Double.parseDouble(header[2].substring(5, header[2].length())); //grabs version number
+					
+					if(!COMMANDS.containsKey(header[0])) { //sees if method is available
+						out.print(getResponse(400));
+					} else if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) { //checks to see if method is supported
+						out.print(getResponse(501));
+					} else if(versionNumber < 0.0 || versionNumber > 1.0) { //checks for version number
+							out.print(getResponse(505));
+					} else {
+						File file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
+						int fileLength = (int) file.length();
+						
+						if(!file.isFile()) { //if FileNotFound -> 404
+							out.print(getResponse(404));
+						} else if(!file.canRead()){ //if no read perms -> 403
+							out.print(getResponse(403));
+						} else {
+							Date lastModifiedDate = new Date(file.lastModified());
+							Date currentDate = new Date();
+							currentDate.setYear(currentDate.getYear() + 1);
+							SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
+							dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+							byte[] payload = readFileData(file, fileLength);
+							
+							if(modifiedDate.length() > 0) {
+								if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
+									Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
+								
+									if(lastModifiedDate.compareTo(ifModifiedDate) == -1) {
+										if(!header[0].contains("HEAD")) {
+											out.print(getResponse(304));
+											out.print("Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+										}
+									} 
+								}
+							}
+							out.print(getResponse(200));
+							out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
+									  "Content-Length: " + fileLength + "\r\n" +
+									  "Last-Modified: " + dateFormat.format(lastModifiedDate) + "\r\n" +
+									  "Content-Encoding: identity" + "\r\n" +
+									  "Allow: GET, POST, HEAD" + "\r\n" +
+									  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+							if(header[0].equals("GET") || header[0].equals("POST"))
+								outStream.write(payload);
+						}
+					}
+				}
+			} catch (SocketTimeoutException se) {
+				out.print(getResponse(408));
+			} catch (RejectedExecutionException ex) {
+				out.print(getResponse(500));
+			}
+			
+			outStream.flush();
+			out.flush();
+			
+			Thread.sleep(250); //wait for 0.25s after flush to close out everything else.
+			
+			outStream.close();
+			out.close();
+			inputStream.close();
+			reader.close();
+		}
+		socket.close();
 	}
 	
 	/**
