@@ -1,16 +1,22 @@
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintStream;
+import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -36,6 +42,19 @@ public class ClientHandler implements Runnable {
 		put("DELETE", 0);
 		put("PUT", 0);
 	}};
+	
+	//Stores script, and arguments if needed
+	private String[] command = new String[2];
+	
+	//Environmental variables
+	private String CONTENT_LENGTH = null,
+				   CONTENT_TYPE,
+				   SCRIPT_NAME,
+				   SERVER_NAME,
+				   SERVER_PORT,
+				   HTTP_FROM,
+				   HTTP_USER_AGENT,
+				   QUERY_STRING;
 	
 	/**
 	 * Default constructor which starts the thread in run()
@@ -63,9 +82,10 @@ public class ClientHandler implements Runnable {
 	 * @throws InterruptedException
 	 */
 	public void processRequest() throws IOException, InterruptedException {
+		
 		if(!socket.isClosed()) {
 			//Initial streams that we need
-			InputStream inputStream = socket.getInputStream();
+			BufferedInputStream inputStream = new BufferedInputStream(socket.getInputStream());
 			PrintStream out = new PrintStream(socket.getOutputStream());
 			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 			DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
@@ -74,80 +94,162 @@ public class ClientHandler implements Runnable {
 			socket.setSoTimeout(5000);
 			try {
 				if(inputStream == null || reader == null)
-					return;
+					return;	
 				
-				String requestLine = reader.readLine();
-				String modifiedDate = reader.readLine();
+				reader.mark(1);
 				
-				if(requestLine == null)
-					return;
-				
-				String[] header = requestLine.split("\\s+");
-				
-				if(header.length != 3) { //if header does not have 3 parts IE method, file, version
-					out.print(getResponse(400));
-				} else {	
-					double versionNumber = 1.0;
-					if(header[2].startsWith("HTTP/"))
-						versionNumber = Double.parseDouble(header[2].substring(5, header[2].length())); //grabs version number
+				synchronized(reader) {
+					String requestLine = reader.readLine();
+					String modifiedDate = reader.readLine();
 					
-					if(!COMMANDS.containsKey(header[0])) { //sees if method is available
+					if(!modifiedDate.startsWith("If-Modified-Since:")) {
+						reader.reset();
+						requestLine = reader.readLine();
+					} 
+					
+					if(requestLine == null)
+						return;
+					
+					String[] header = requestLine.split("\\s+");
+					
+					if(header.length != 3) { //if header does not have 3 parts IE method, file, version
 						out.print(getResponse(400));
-					} else if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) { //checks to see if method is supported
-						out.print(getResponse(501));
-					} else if(versionNumber < 0.0 || versionNumber > 1.0) { //checks for version number
-							out.print(getResponse(505));
-					} else {
-						File file = new File(header[1].substring(1, header[1].length())).getAbsoluteFile();
-						int fileLength = (int) file.length();
+					} else {	
+						double versionNumber = 1.0;
+						if(header[2].startsWith("HTTP/"))
+							versionNumber = Double.parseDouble(header[2].substring(5, header[2].length())); //grabs version number
 						
-						if(!file.isFile()) { //if FileNotFound -> 404
-							out.print(getResponse(404));
-						} else if(!file.canRead()){ //if no read perms -> 403
-							out.print(getResponse(403));
+						if(!COMMANDS.containsKey(header[0])) { //sees if method is available
+							out.print(getResponse(400));
+						} else if(COMMANDS.containsKey(header[0]) && COMMANDS.get(header[0]) == 0) { //checks to see if method is supported
+							out.print(getResponse(501));
+						} else if(versionNumber < 0.0 || versionNumber > 1.0) { //checks for version number
+								out.print(getResponse(505));
 						} else {
-							Date lastModifiedDate = new Date(file.lastModified());
-							Date currentDate = new Date();
-							currentDate.setYear(currentDate.getYear() + 1);
-							SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
-							dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
-							byte[] payload = readFileData(file, fileLength);
+							File file = new File("." + header[1]);
+							int fileLength = (int) file.length();
 							
-							if(modifiedDate.length() > 0) {
-								if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
-									Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
+							if(!file.isFile()) { //if FileNotFound -> 404
+								if(header[0].equals("POST"))
+									out.print(getResponse(405));
+								else
+									out.print(getResponse(404));
+							} else if(!file.canRead()){ //if no read perms -> 403
+								out.print(getResponse(403));
+							} else {
+								Date lastModifiedDate = new Date(file.lastModified());
+								Date currentDate = new Date();
+								currentDate.setYear(currentDate.getYear() + 1);
+								SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
+								dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+								byte[] payload = readFileData(file, fileLength);
+									
+								if(modifiedDate.length() > 0) {
+									if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
+										Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
+										
+										if(lastModifiedDate.compareTo(ifModifiedDate) == -1) {
+											if(!header[0].contains("HEAD")) {
+												out.print(getResponse(304));
+												out.print("Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+											}
+										} 
+									}
+								}
 								
-									if(lastModifiedDate.compareTo(ifModifiedDate) == -1) {
-										if(!header[0].contains("HEAD")) {
-											out.print(getResponse(304));
-											out.print("Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+								if(header[0].equals("GET") || header[0].equals("HEAD")) {
+									out.print(getResponse(200));
+									out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
+										  "Content-Length: " + fileLength + "\r\n" +
+										  "Last-Modified: " + dateFormat.format(lastModifiedDate) + "\r\n" +
+										  "Content-Encoding: identity" + "\r\n" +
+										  "Allow: GET, POST, HEAD" + "\r\n" +
+										  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+									if(header[0].equals("GET"))
+										outStream.write(payload);
+								} else { //else POST
+									command[0] = "." + header[1];
+									SCRIPT_NAME = header[1].substring(0, header[1].length());
+									String line = null;
+								    while(reader.ready())  {
+								    	line = reader.readLine();
+								    	if(line.startsWith("From:"))
+											HTTP_FROM = line.substring(6, line.length());
+										if(line.startsWith("User-Agent:"))
+											HTTP_USER_AGENT = line.substring(12, line.length());
+										if(line.startsWith("Content-Length:"))
+											CONTENT_LENGTH = line.substring(16, line.length());	
+										if(line.startsWith("Content-Type:"))
+											CONTENT_TYPE = line.substring(14, line.length());
+								    }
+								    
+								    if(line.trim().isEmpty() == false) {
+								    	QUERY_STRING = line;
+								    	command[1] = QUERY_STRING;
+								    }
+									
+									if(CONTENT_LENGTH == null) {
+										out.print(getResponse(411));
+									} else if(CONTENT_TYPE == null) {
+										out.print(getResponse(500));
+									} else if(!SCRIPT_NAME.endsWith(".cgi")) {
+										out.print(getResponse(405));
+									} else {
+									    String result = "";
+										ProcessBuilder pb = new ProcessBuilder(command[0]);
+										Map<String, String> env = pb.environment();
+										env.put("CONTENT_LENGTH", CONTENT_LENGTH);
+										env.put("SCRIPT_NAME", header[1]);
+										env.put("SERVER_NAME", String.valueOf(InetAddress.getLocalHost()));
+										env.put("SERVER_PORT", String.valueOf(socket.getPort()));
+										env.put("HTTP_FROM", HTTP_FROM);
+										env.put("HTTP_USER_AGENT", HTTP_USER_AGENT);
+										
+										Process process = pb.start();
+										
+										if(command[1] != null) {
+											OutputStream stdin = process.getOutputStream();
+											stdin.write(decode(command[1]).getBytes());
+											stdin.close();
 										}
-									} 
+
+										BufferedReader stdout = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+										result = stdout.readLine();
+
+										while (stdout.ready()) {
+											result += '\n' + stdout.readLine();
+										}
+										
+										if(result == null) {
+											out.print(getResponse(204));
+										} else {
+											out.print(getResponse(200));
+											out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
+													  "Content-Length: " + (result.length() + 1) + "\r\n" +
+													  "Allow: GET, POST, HEAD" + "\r\n" +
+													  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+											outStream.writeBytes(result);
+										}
+										stdout.close();
+										process.destroy();
+									}
 								}
 							}
-							out.print(getResponse(200));
-							out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
-									  "Content-Length: " + fileLength + "\r\n" +
-									  "Last-Modified: " + dateFormat.format(lastModifiedDate) + "\r\n" +
-									  "Content-Encoding: identity" + "\r\n" +
-									  "Allow: GET, POST, HEAD" + "\r\n" +
-									  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
-							if(header[0].equals("GET") || header[0].equals("POST"))
-								outStream.write(payload);
 						}
 					}
 				}
+			} catch (SocketException se) {
+				
 			} catch (SocketTimeoutException se) {
 				out.print(getResponse(408));
 			} catch (RejectedExecutionException ex) {
 				out.print(getResponse(500));
 			}
-			
 			outStream.flush();
 			out.flush();
 			
 			Thread.sleep(250); //wait for 0.25s after flush to close out everything else.
-			
 			outStream.close();
 			out.close();
 			inputStream.close();
@@ -176,6 +278,56 @@ public class ClientHandler implements Runnable {
 		}
 		return fileData;
 	}
+
+	/**
+	 * Decodes encoded message
+	 * @param input message from script
+	 * @return input message but removing the encoding
+	 */
+	public String decode(String input) {
+		if(input.contains("!!"))
+			input = input.replaceAll("!!", "!");
+		if(input.contains("!*"))
+			input = input.replaceAll("!*", "*");
+		if(input.contains("!'"))
+			input = input.replaceAll("!'", "'");
+		if(input.contains("!("))
+			input = input.replaceAll("!(", "(");
+		if(input.contains("!)"))
+			input = input.replaceAll("!)", ")");
+		if(input.contains("!;"))
+			input = input.replaceAll("!;", ";");
+		if(input.contains("!:"))
+			input = input.replaceAll("!:", ":");
+		if(input.contains("!@"))
+			input = input.replaceAll("!@", "@");
+		if(input.contains("!$"))
+			input = input.replaceAll("!$", "$");
+		if(input.contains("!+"))
+			input = input.replaceAll("!+", "+");
+		if(input.contains("!,"))
+			input = input.replaceAll("!,", ",");
+		if(input.contains("!/"))
+			input = input.replaceAll("!/", "/");
+		if(input.contains("!?"))
+			input = input.replaceAll("!?", "?");
+		if(input.contains("!#"))
+			input = input.replaceAll("!#", "#");
+		if(input.contains("!["))
+			input = input.replaceAll("!\\[", "\\[");
+		if(input.contains("!]"))
+			input = input.replaceAll("!]", "]");
+		return input;
+	}
+	
+	public static byte[] getBytesFromInputStream(InputStream is) throws IOException {
+	    ByteArrayOutputStream os = new ByteArrayOutputStream(); 
+	    byte[] buffer = new byte[0xFFFF];
+	    for (int len = is.read(buffer); len != -1; len = is.read(buffer)) { 
+	        os.write(buffer, 0, len);
+	    }
+	    return os.toByteArray();
+	}
 	
 	/**
 	 * Return response type based on code passed in. Utilized for writing response back to user.
@@ -185,6 +337,8 @@ public class ClientHandler implements Runnable {
 	public String getResponse(int code) {
 		if(code == 200)
 			return "HTTP/1.0 200 OK\r\n";
+		if(code == 204)
+			return "HTTP/1.0 204 No Content\r\n";
 		if(code == 304)
 			return "HTTP/1.0 304 Not Modified\r\n";
 		if(code == 400)
@@ -193,8 +347,12 @@ public class ClientHandler implements Runnable {
 			return "HTTP/1.0 403 Forbidden\r\n";
 		if(code == 404)
 			return "HTTP/1.0 404 Not Found\r\n";
+		if(code == 405)
+			return "HTTP/1.0 405 Method Not Allowed\r\n";
 		if(code == 408)
 			return "HTTP/1.0 408 Request Timeout\r\n";
+		if(code == 411)
+			return "HTTP/1.0 411 Length Required\r\n";
 		if(code == 500)
 			return "HTTP/1.0 500 Internal Server Error\r\n";
 		if(code == 501)
@@ -214,7 +372,7 @@ public class ClientHandler implements Runnable {
 	public String contentType(String fileName) {
 		if(fileName.endsWith(".txt"))
 			return "text/plain";
-		if(fileName.endsWith(".htm") || fileName.endsWith(".html"))
+		if(fileName.endsWith(".htm") || fileName.endsWith(".html") || fileName.endsWith(".cgi"))
 			return "text/html";
 		if(fileName.endsWith(".gif"))
 			return "image/gif";
