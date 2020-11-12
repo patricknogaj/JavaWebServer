@@ -320,15 +320,6 @@ public class ClientHandler implements Runnable {
 		return input;
 	}
 	
-	public static byte[] getBytesFromInputStream(InputStream is) throws IOException {
-	    ByteArrayOutputStream os = new ByteArrayOutputStream(); 
-	    byte[] buffer = new byte[0xFFFF];
-	    for (int len = is.read(buffer); len != -1; len = is.read(buffer)) { 
-	        os.write(buffer, 0, len);
-	    }
-	    return os.toByteArray();
-	}
-	
 	/**
 	 * Return response type based on code passed in. Utilized for writing response back to user.
 	 * @param code - response code.
