@@ -1,11 +1,8 @@
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -88,7 +85,6 @@ public class ClientHandler implements Runnable {
 			BufferedInputStream inputStream = new BufferedInputStream(socket.getInputStream());
 			PrintStream out = new PrintStream(socket.getOutputStream());
 			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-			DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
 
 			//5 second timeout for err 408
 			socket.setSoTimeout(5000);
@@ -166,7 +162,7 @@ public class ClientHandler implements Runnable {
 										  "Allow: GET, POST, HEAD" + "\r\n" +
 										  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
 									if(header[0].equals("GET"))
-										outStream.write(payload);
+										out.write(payload);
 								} else { //else POST
 									command[0] = "." + header[1];
 									SCRIPT_NAME = header[1].substring(0, header[1].length());
@@ -239,7 +235,7 @@ public class ClientHandler implements Runnable {
 													  "Content-Length: " + result.length() + "\r\n" +
 													  "Allow: GET, POST, HEAD" + "\r\n" +
 													  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
-											outStream.writeBytes(result);
+											out.print(result);
 										}
 										stdout.close();
 										process.destroy();
@@ -256,11 +252,9 @@ public class ClientHandler implements Runnable {
 			} catch (RejectedExecutionException ex) {
 				out.print(getResponse(500));
 			}
-			outStream.flush();
 			out.flush();
 			
 			Thread.sleep(250); //wait for 0.25s after flush to close out everything else.
-			outStream.close();
 			out.close();
 			inputStream.close();
 			reader.close();
