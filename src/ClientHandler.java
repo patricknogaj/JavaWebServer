@@ -195,8 +195,10 @@ public class ClientHandler implements Runnable {
 									} else if(!SCRIPT_NAME.endsWith(".cgi")) {
 										out.print(getResponse(405));
 									} else {
-									    String result = "";
+										String result = "";
 										ProcessBuilder pb = new ProcessBuilder(command[0]);
+										
+										//set environmental variables for Processes
 										Map<String, String> env = pb.environment();
 										env.put("CONTENT_LENGTH", CONTENT_LENGTH);
 										env.put("SCRIPT_NAME", header[1]);
@@ -207,6 +209,7 @@ public class ClientHandler implements Runnable {
 										
 										Process process = pb.start();
 										
+										//send arguments to std in if arguments are available
 										if(command[1] != null) {
 											OutputStream stdin = process.getOutputStream();
 											stdin.write(decode(command[1]).getBytes());
@@ -217,16 +220,23 @@ public class ClientHandler implements Runnable {
 
 										result = stdout.readLine();
 
+										//generate payload
 										while (stdout.ready()) {
 											result += '\n' + stdout.readLine();
 										}
 										
-										if(result == null) {
+										//if result is not null, add new line to get
+										//appropriate length.
+										if(result != null) {
+											result += '\n';
+										}
+										
+										if(result == null) { //if no content displayed --> err 204
 											out.print(getResponse(204));
 										} else {
 											out.print(getResponse(200));
 											out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
-													  "Content-Length: " + (result.length() + 1) + "\r\n" +
+													  "Content-Length: " + result.length() + "\r\n" +
 													  "Allow: GET, POST, HEAD" + "\r\n" +
 													  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
 											outStream.writeBytes(result);
