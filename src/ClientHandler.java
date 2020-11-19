@@ -221,12 +221,6 @@ public class ClientHandler implements Runnable {
 											result += '\n' + stdout.readLine();
 										}
 										
-										//if result is not null, add new line to get
-										//appropriate length.
-										if(result != null) {
-											result += '\n';
-										}
-										
 										if(result == null) { //if no content displayed --> err 204
 											out.print(getResponse(204));
 										} else {
