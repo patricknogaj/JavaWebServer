@@ -40,6 +40,8 @@ public class ClientHandler implements Runnable {
 		put("PUT", 0);
 	}};
 	
+	static int counter = 1;
+	
 	//Stores script, and arguments if needed
 	private String[] command = new String[2];
 	
@@ -225,11 +227,15 @@ public class ClientHandler implements Runnable {
 											out.print(getResponse(204));
 										} else {
 											out.print(getResponse(200));
-											out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
+											out.print("Content-Type: text/html\r\n" +
 													  "Content-Length: " + result.length() + "\r\n" +
 													  "Allow: GET, POST, HEAD" + "\r\n" +
 													  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
 											out.print(result);
+											
+											System.out.println("Test case #: " + counter);
+											System.out.println(result);
+											System.out.println();
 										}
 										stdout.close();
 										process.destroy();
@@ -361,7 +367,7 @@ public class ClientHandler implements Runnable {
 	public String contentType(String fileName) {
 		if(fileName.endsWith(".txt"))
 			return "text/plain";
-		if(fileName.endsWith(".htm") || fileName.endsWith(".html") || fileName.endsWith(".cgi"))
+		if(fileName.endsWith(".htm") || fileName.endsWith(".html"))
 			return "text/html";
 		if(fileName.endsWith(".gif"))
 			return "image/gif";
