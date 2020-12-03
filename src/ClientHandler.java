@@ -162,6 +162,7 @@ public class ClientHandler implements Runnable {
 										  "Content-Encoding: identity" + "\r\n" +
 										  "Allow: GET, POST, HEAD" + "\r\n" +
 										  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+										  System.out.println(header[1] + " lastMod: " + dateFormat.format(lastModifiedDate));
 									if(header[0].equals("GET"))
 										out.write(payload);
 								} else { //else POST
@@ -189,13 +190,14 @@ public class ClientHandler implements Runnable {
 								    }
 								    
 								    if(QUERY_STRING.trim().isEmpty() == false) {
-								    	command[1] = QUERY_STRING;
+										command[1] = QUERY_STRING;
+										CONTENT_LENGTH = Integer.toString(QUERY_STRING.length());
 								    }
 									
-									if(CONTENT_LENGTH == null) {
-										out.print(getResponse(411));
-									} else if(CONTENT_TYPE == null) {
+									if(CONTENT_TYPE == null) {
 										out.print(getResponse(500));
+									} else if(CONTENT_LENGTH == null) {
+										out.print(getResponse(411));
 									} else if(!SCRIPT_NAME.endsWith(".cgi")) {
 										out.print(getResponse(405));
 									} else {
