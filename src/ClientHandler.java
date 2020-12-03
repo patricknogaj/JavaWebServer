@@ -40,8 +40,6 @@ public class ClientHandler implements Runnable {
 		put("PUT", 0);
 	}};
 	
-	static int counter = 1;
-	
 	//Stores script, and arguments if needed
 	private String[] command = new String[2];
 	
@@ -97,6 +95,7 @@ public class ClientHandler implements Runnable {
 				reader.mark(1);
 				
 				synchronized(reader) {
+					
 					String requestLine = reader.readLine();
 					String modifiedDate = reader.readLine();
 					
@@ -168,21 +167,28 @@ public class ClientHandler implements Runnable {
 								} else { //else POST
 									command[0] = "." + header[1];
 									SCRIPT_NAME = header[1].substring(0, header[1].length());
+									QUERY_STRING = "";
 									String line = null;
 								    while(reader.ready())  {
 								    	line = reader.readLine();
-								    	if(line.startsWith("From:"))
-											HTTP_FROM = line.substring(6, line.length());
-										if(line.startsWith("User-Agent:"))
-											HTTP_USER_AGENT = line.substring(12, line.length());
-										if(line.startsWith("Content-Length:"))
+								    	if(line.startsWith("From:")) {
+								    		HTTP_FROM = line.substring(6, line.length());
+								    		continue;
+								    	} else if(line.startsWith("User-Agent:")) {
+								    		HTTP_USER_AGENT = line.substring(12, line.length());
+								    		continue;
+								    	} else if(line.startsWith("Content-Length:")) {
 											CONTENT_LENGTH = line.substring(16, line.length());	
-										if(line.startsWith("Content-Type:"))
+											continue;
+								    	} else if(line.startsWith("Content-Type:")) {
 											CONTENT_TYPE = line.substring(14, line.length());
+											continue;
+								    	} else {
+								    		QUERY_STRING = QUERY_STRING.concat(line);
+								    	}
 								    }
 								    
-								    if(line.trim().isEmpty() == false) {
-								    	QUERY_STRING = line;
+								    if(QUERY_STRING.trim().isEmpty() == false) {
 								    	command[1] = QUERY_STRING;
 								    }
 									
@@ -209,8 +215,9 @@ public class ClientHandler implements Runnable {
 										
 										//send arguments to std in if arguments are available
 										if(command[1] != null) {
+											//System.out.println("Decoded: " + decode(command[1]));
 											OutputStream stdin = process.getOutputStream();
-											stdin.write(decode(command[1]).getBytes());
+											stdin.write((command[1].replaceAll("(\\!)([\\!\\*'\\(\\);:@&\\+,/\\?#\\[\\]\\s])", "$2")).getBytes());
 											stdin.close();
 										}
 
@@ -232,10 +239,6 @@ public class ClientHandler implements Runnable {
 													  "Allow: GET, POST, HEAD" + "\r\n" +
 													  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
 											out.print(result);
-											
-											System.out.println("Test case #: " + counter);
-											System.out.println(result);
-											System.out.println();
 										}
 										stdout.close();
 										process.destroy();
@@ -281,47 +284,6 @@ public class ClientHandler implements Runnable {
 				fileInput.close();
 		}
 		return fileData;
-	}
-
-	/**
-	 * Decodes encoded message
-	 * @param input message from script
-	 * @return input message but removing the encoding
-	 */
-	public String decode(String input) {
-		if(input.contains("!!"))
-			input = input.replaceAll("!!", "!");
-		if(input.contains("!*"))
-			input = input.replaceAll("!*", "*");
-		if(input.contains("!'"))
-			input = input.replaceAll("!'", "'");
-		if(input.contains("!("))
-			input = input.replaceAll("!(", "(");
-		if(input.contains("!)"))
-			input = input.replaceAll("!)", ")");
-		if(input.contains("!;"))
-			input = input.replaceAll("!;", ";");
-		if(input.contains("!:"))
-			input = input.replaceAll("!:", ":");
-		if(input.contains("!@"))
-			input = input.replaceAll("!@", "@");
-		if(input.contains("!$"))
-			input = input.replaceAll("!$", "$");
-		if(input.contains("!+"))
-			input = input.replaceAll("!+", "+");
-		if(input.contains("!,"))
-			input = input.replaceAll("!,", ",");
-		if(input.contains("!/"))
-			input = input.replaceAll("!/", "/");
-		if(input.contains("!?"))
-			input = input.replaceAll("!?", "?");
-		if(input.contains("!#"))
-			input = input.replaceAll("!#", "#");
-		if(input.contains("!["))
-			input = input.replaceAll("!\\[", "\\[");
-		if(input.contains("!]"))
-			input = input.replaceAll("!]", "]");
-		return input;
 	}
 	
 	/**
