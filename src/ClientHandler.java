@@ -10,12 +10,16 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.URLEncoder;
+import java.net.URLDecoder;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.RejectedExecutionException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Rutgers University -- Information Technology CS352
@@ -52,6 +56,8 @@ public class ClientHandler implements Runnable {
 				   HTTP_FROM,
 				   HTTP_USER_AGENT,
 				   QUERY_STRING;
+
+	static String COOKIE_VAL;
 	
 	/**
 	 * Default constructor which starts the thread in run()
@@ -95,14 +101,21 @@ public class ClientHandler implements Runnable {
 				reader.mark(1);
 				
 				synchronized(reader) {
-					
+
 					String requestLine = reader.readLine();
 					String modifiedDate = reader.readLine();
+					String hostLine = reader.readLine();
+					String cLine = reader.readLine();
+					String dLine = reader.readLine();
+
+					System.out.println(requestLine);
+					System.out.println(dLine);
+					System.out.println();
 					
 					if(!modifiedDate.startsWith("If-Modified-Since:")) {
 						reader.reset();
 						requestLine = reader.readLine();
-					} 
+					}
 					
 					if(requestLine == null)
 						return;
@@ -123,6 +136,28 @@ public class ClientHandler implements Runnable {
 						} else if(versionNumber < 0.0 || versionNumber > 1.0) { //checks for version number
 								out.print(getResponse(505));
 						} else {
+							LocalDateTime myDateObj = LocalDateTime.now();
+							DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+							String formattedDate = myDateObj.format(myFormatObj);
+							String encodedDateTime = URLEncoder.encode(formattedDate, "UTF-8");
+
+							if(header[1].equals("/")) {
+								if(dLine == null || dLine.trim().isEmpty()) {
+									header[1] = "/index.html";
+								} else {
+									String[] cookieL = dLine.split(":");
+									System.out.println(cookieL[1] + " and " + COOKIE_VAL);
+									if(cookieL[1].trim().equals(COOKIE_VAL)) {
+										System.out.println("Returning index_seen.html");
+										header[1] = "/index_seen.html";
+										LocalDateTime newTime = LocalDateTime.now();
+										String newFormattedDate = newTime.format(myFormatObj);
+										String eDateTime = URLEncoder.encode(newFormattedDate, "UTF-8");
+										COOKIE_VAL = "lasttime=" + eDateTime;
+									} else
+										header[1] = "/index.html";
+								}
+							}
 							File file = new File("." + header[1]);
 							int fileLength = (int) file.length();
 							
@@ -140,7 +175,8 @@ public class ClientHandler implements Runnable {
 								SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
 								dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
 								byte[] payload = readFileData(file, fileLength);
-									
+								//String decodedDateTime = URLDecoder.decode(encodedDateTime, "UTF-8");
+
 								if(modifiedDate.length() > 0) {
 									if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
 										Date ifModifiedDate = new Date(modifiedDate.substring(19, modifiedDate.length()));
@@ -158,13 +194,26 @@ public class ClientHandler implements Runnable {
 									out.print(getResponse(200));
 									out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
 										  "Content-Length: " + fileLength + "\r\n" +
+										  //(COOKIE_VAL == null ? "Set-Cookie: lasttime=" + encodedDateTime + "\r\n" : "Cookie: lasttime=" + decodedDateTime + "\r\n")
+										  "Set-Cookie: lasttime=" + encodedDateTime + "\r\n"+
 										  "Last-Modified: " + dateFormat.format(lastModifiedDate) + "\r\n" +
 										  "Content-Encoding: identity" + "\r\n" +
 										  "Allow: GET, POST, HEAD" + "\r\n" +
 										  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
-										  System.out.println(header[1] + " lastMod: " + dateFormat.format(lastModifiedDate));
-									if(header[0].equals("GET"))
+									System.out.print(getResponse(200));
+									System.out.print("Content-Type: " + contentType(header[1]) + "\r\n" +
+										  "Content-Length: " + payload.length + "\r\n" +
+										  "Set-Cookie: lasttime=" + encodedDateTime + "\r\n"+
+										  "Last-Modified: " + dateFormat.format(lastModifiedDate) + "\r\n" +
+										  "Content-Encoding: identity" + "\r\n" +
+										  "Allow: GET, POST, HEAD" + "\r\n" +
+										  "Expires: " + dateFormat.format(currentDate)+ "\r\n\r\n");
+									if(header[0].equals("GET")) {
 										out.write(payload);
+										String s = new String(payload);
+										System.out.println(s);
+									}
+									COOKIE_VAL = "lasttime=" + encodedDateTime;
 								} else { //else POST
 									command[0] = "." + header[1];
 									SCRIPT_NAME = header[1].substring(0, header[1].length());
@@ -183,6 +232,9 @@ public class ClientHandler implements Runnable {
 											continue;
 								    	} else if(line.startsWith("Content-Type:")) {
 											CONTENT_TYPE = line.substring(14, line.length());
+											continue;
+										}else if(line.startsWith("Set-Cookie:")) {
+											System.out.println("HEY COOKIE LINE: " + line);
 											continue;
 								    	} else {
 								    		QUERY_STRING = QUERY_STRING.concat(line);
@@ -217,9 +269,15 @@ public class ClientHandler implements Runnable {
 										
 										//send arguments to std in if arguments are available
 										if(command[1] != null) {
-											//System.out.println("Decoded: " + decode(command[1]));
+											command[1] = command[1].replaceAll("(\\!)([\\!\\*'\\(\\);:@&\\+,/\\?#\\[\\]\\s])", "$2");
+											if(command[1].contains("password=")) {
+												int passwordIndex = command[1].indexOf("password=") + 9;
+												System.out.println("Password is: " + command[1].substring(passwordIndex, command[1].length())); 
+												System.out.println("Cookie value is: " + generateChecksum(command[1].substring(passwordIndex, command[1].length())));
+												//env.put("Cookie")
+											}
 											OutputStream stdin = process.getOutputStream();
-											stdin.write((command[1].replaceAll("(\\!)([\\!\\*'\\(\\);:@&\\+,/\\?#\\[\\]\\s])", "$2")).getBytes());
+											stdin.write((command[1]).getBytes());
 											stdin.close();
 										}
 
@@ -286,6 +344,15 @@ public class ClientHandler implements Runnable {
 				fileInput.close();
 		}
 		return fileData;
+	}
+
+	public int generateChecksum(String value) {
+		int checksum = 0;
+		value = value + "\n";
+		for(int i = 0; i < value.length(); i++) {
+			checksum += (value.charAt(i));
+		}
+		return checksum;
 	}
 	
 	/**

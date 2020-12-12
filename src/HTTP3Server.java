@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
  * 
  */
 
-public class HTTP1Server {
+public class HTTP3Server {
 	
 	/**
 	 * We start by attempting to parse arg[0] as an Integer which will be stored into port variable.
