@@ -146,9 +146,7 @@ public class ClientHandler implements Runnable {
 									header[1] = "/index.html";
 								} else {
 									String[] cookieL = dLine.split(":");
-									System.out.println(cookieL[1] + " and " + COOKIE_VAL);
 									if(cookieL[1].trim().equals(COOKIE_VAL)) {
-										System.out.println("Returning index_seen.html");
 										header[1] = "/index_seen.html";
 										LocalDateTime newTime = LocalDateTime.now();
 										String newFormattedDate = newTime.format(myFormatObj);
@@ -175,7 +173,10 @@ public class ClientHandler implements Runnable {
 								SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM YYYY HH:mm:ss zzz");
 								dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
 								byte[] payload = readFileData(file, fileLength);
-								//String decodedDateTime = URLDecoder.decode(encodedDateTime, "UTF-8");
+								if(header[1] == "/index_seen.html") {
+									String decodedDateTime = URLDecoder.decode(encodedDateTime, "UTF-8");
+									payload = generatePayload(payload, decodedDateTime);
+								}
 
 								if(modifiedDate.length() > 0) {
 									if(modifiedDate.substring(19, modifiedDate.length()).length() > 28) {
@@ -353,6 +354,16 @@ public class ClientHandler implements Runnable {
 			checksum += (value.charAt(i));
 		}
 		return checksum;
+	}
+
+	/**
+	 * Replaces %YEAR-%MONTH-%DAY...with the decoded date
+	 */
+	public byte[] generatePayload(byte[] input, String date) {
+		String inputString = new String(input);
+		inputString = inputString.replace("%YEAR-%MONTH-%DAY %HOUR-%MINUTE-%SECOND", date);
+		byte[] output = inputString.getBytes();
+		return output;
 	}
 	
 	/**
