@@ -25,7 +25,7 @@ public class HTTP3Server {
 	 */
 	public static void main(String[] args) {
 		
-		ThreadPoolExecutor executor = new ThreadPoolExecutor(5, 50, 1, TimeUnit.SECONDS, new SynchronousQueue<Runnable>());
+		ThreadPoolExecutor executor = new ThreadPoolExecutor(5, 50, 100, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>());
 		int port = 0;
 		
 		if(args.length > 0) {
