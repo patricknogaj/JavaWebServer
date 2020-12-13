@@ -174,7 +174,7 @@ public class ClientHandler implements Runnable {
 								dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
 								byte[] payload = readFileData(file, fileLength);
 								if(header[1] == "/index_seen.html") {
-									String decodedDateTime = URLDecoder.decode(encodedDateTime, "UTF-8");
+									String decodedDateTime = URLDecoder.decode(COOKIE_VAL.substring(9, COOKIE_VAL.length()), "UTF-8");
 									payload = generatePayload(payload, decodedDateTime);
 								}
 
